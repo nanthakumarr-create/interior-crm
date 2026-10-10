@@ -1,0 +1,32 @@
+{
+  "uid": "aangan_crm_sync_app",
+  "type": "app",
+  "config": {
+    "description": "Aangan Studio enquiry engine: creates a contact and deal for each new qualified inbound call.",
+    "name": "Aangan Enquiry Sync",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.contacts.read",
+        "crm.objects.contacts.write",
+        "crm.objects.deals.read",
+        "crm.objects.deals.write"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": ["https://api.hubapi.com"],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "nanthakumar_r@pg27.mesaschool.co",
+      "documentationUrl": "https://interior-crm-ten.vercel.app",
+      "supportUrl": "https://interior-crm-ten.vercel.app",
+      "supportPhone": "+910000000000"
+    }
+  }
+}
