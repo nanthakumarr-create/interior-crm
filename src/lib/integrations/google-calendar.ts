@@ -1,14 +1,53 @@
 import "server-only";
 import { createSign } from "node:crypto";
+import { getVercelOidcToken } from "@vercel/oidc";
 
 // Google Calendar via a service account. The studio shares its consultations calendar
 // with the service account's email ("Make changes to events"), so no user OAuth is needed.
-// GOOGLE_SERVICE_ACCOUNT_JSON: the key file contents, base64-encoded. GOOGLE_CALENDAR_ID: the calendar's id.
+//
+// Two ways to act as the service account:
+//  - Keyless (default): Workload Identity Federation trusts Vercel's OIDC token.
+//    GCP_WIF_AUDIENCE = //iam.googleapis.com/projects/<num>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+//    GCP_SERVICE_ACCOUNT_EMAIL = the service account. (The school org blocks key creation.)
+//  - Key file: GOOGLE_SERVICE_ACCOUNT_JSON = the key JSON, base64-encoded.
+// GOOGLE_CALENDAR_ID = the shared calendar's id.
 
 type ServiceAccount = { client_email: string; private_key: string };
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+
+const federationConfigured = () => Boolean(process.env.GCP_WIF_AUDIENCE && process.env.GCP_SERVICE_ACCOUNT_EMAIL);
 
 export function calendarConfigured() {
-  return Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_CALENDAR_ID);
+  return Boolean((federationConfigured() || process.env.GOOGLE_SERVICE_ACCOUNT_JSON) && process.env.GOOGLE_CALENDAR_ID);
+}
+
+/** Vercel OIDC token -> Google STS federated token -> short-lived service account access token. */
+async function federatedAccessToken() {
+  const sts = await fetch("https://sts.googleapis.com/v1/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      audience: process.env.GCP_WIF_AUDIENCE,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+      subject_token: await getVercelOidcToken(),
+    }),
+  });
+  if (!sts.ok) throw new Error(`Google STS ${sts.status}: ${(await sts.text()).slice(0, 200)}`);
+  const federated = (await sts.json()).access_token;
+  const res = await fetch(
+    `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${process.env.GCP_SERVICE_ACCOUNT_EMAIL}:generateAccessToken`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${federated}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: [CALENDAR_SCOPE], lifetime: "3600s" }),
+    },
+  );
+  if (!res.ok) throw new Error(`Google impersonation ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const json = await res.json();
+  return { token: json.accessToken as string, expires: new Date(json.expireTime).getTime() };
 }
 
 function serviceAccount(): ServiceAccount {
@@ -19,12 +58,16 @@ let cached: { token: string; expires: number } | undefined;
 
 async function accessToken() {
   if (cached && cached.expires > Date.now() + 60_000) return cached.token;
+  if (federationConfigured()) {
+    cached = await federatedAccessToken();
+    return cached.token;
+  }
   const sa = serviceAccount();
   const now = Math.floor(Date.now() / 1000);
   const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
   const unsigned = `${b64({ alg: "RS256", typ: "JWT" })}.${b64({
     iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/calendar",
+    scope: CALENDAR_SCOPE,
     aud: "https://oauth2.googleapis.com/token",
     iat: now,
     exp: now + 3600,
