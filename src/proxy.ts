@@ -35,6 +35,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skip static assets and webhooks (those authenticate with signatures)
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/webhooks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Skip static assets, webhooks and Vaani tools (those authenticate with signatures / X-Tool-Secret)
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
