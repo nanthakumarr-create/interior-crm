@@ -35,7 +35,7 @@ export async function handleVaaniEvent(db: Db, payload: VaaniWebhook, opts: { is
 
   const { data: existing } = await db
     .from("calls")
-    .select("id, phone, started_at, route, processing_error")
+    .select("id, phone, started_at, route, processing_error, booking_at")
     .eq("vaani_call_id", callId)
     .maybeSingle();
   const eventPhone = normalizePhone(payload.phone_number ?? data.phone_number);
@@ -85,9 +85,11 @@ export async function handleVaaniEvent(db: Db, payload: VaaniWebhook, opts: { is
     entities,
     dispositions: data.dispositions ?? null,
     agent_route: agentRoute,
-    booking_at: parseDate(pick(entities, "booking_time", "consultation_time", "consultation_slot", "booked_slot")),
     raw: payload,
   };
+  // The book_consultation tool already stored the booking mid-call; only fill it from extraction if missing
+  const extractedBooking = parseDate(pick(entities, "booking_time", "consultation_time", "consultation_slot", "booked_slot"));
+  if (extractedBooking && !existing?.booking_at) base.booking_at = extractedBooking;
   const { data: saved, error: saveError } = await db
     .from("calls")
     .upsert(base, { onConflict: "vaani_call_id" })

@@ -1,10 +1,12 @@
 // Pushes every non-empty key in .env.local to Vercel (preview + development) without printing values.
-// Usage: node scripts/sync-vercel-env.mjs [KEY ...]   (no keys = all)
+// Usage: node scripts/sync-vercel-env.mjs [--prod] [KEY ...]   (no keys = all; --prod adds production)
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const SKIP = new Set(["VERCEL_OIDC_TOKEN", "NEXT_PUBLIC_APP_URL"]);
-const only = process.argv.slice(2);
+const args = process.argv.slice(2);
+const only = args.filter((a) => !a.startsWith("--"));
+const targets = args.includes("--prod") ? ["production", "preview", "development"] : ["preview", "development"];
 const entries = readFileSync(".env.local", "utf8")
   .split(/\r?\n/)
   .map((l) => l.replace(/^﻿/, ""))
@@ -16,7 +18,7 @@ const vercel = (args, input) =>
   spawnSync("vercel", args, { input, encoding: "utf8", shell: process.platform === "win32" });
 
 for (const [key, value] of entries) {
-  for (const target of ["preview", "development"]) {
+  for (const target of targets) {
     vercel(["env", "rm", key, target, "--yes"]); // replace if it already exists
     // NEXT_PUBLIC_ values ship to the browser anyway, so they are Config, not Secret
     const kind = key.startsWith("NEXT_PUBLIC_") ? ["--no-sensitive"] : [];
