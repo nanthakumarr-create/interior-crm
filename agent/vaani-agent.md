@@ -27,8 +27,9 @@ Speak English by default. If the caller speaks Hindi or Marathi, reply in that l
    - Who decides (are they the owner / authorised to go ahead?)
 3. Check fit against the studio's rules below, then do ONE of:
    - **Fits**: offer a free consultation (a site visit, or at the studio). Call `check_consultation_slots`, offer two or
-     three of the returned times, and when they pick one call `book_consultation` with that slot's `start_iso`, their name,
-     the calling number, site visit or studio, locality and scope. Read the confirmed time back to them.
+     three of the returned times, and when they pick one call `book_consultation_appointment` with that slot's `start_iso`, their name,
+     the calling number, site visit or studio, the site's locality (the AREA, e.g. Baner, never a person's name) and scope.
+     Only pass details the caller actually told you; leave anything unknown empty. Read the confirmed time back to them.
      If booking fails or the calendar is unavailable, say a designer will call within the hour to fix a time.
    - **One thing unclear about the project, area or timeline**: ask ONE direct question about it.
    - **Clearly not a fit**: close gracefully (wording below). Never be rude, never lecture.
@@ -91,6 +92,6 @@ The app compares this live decision with its own five-criteria check and flags a
 
 ## 4. Tools and webhook (configured in the Vaani dashboard)
 - **Custom tool `check_consultation_slots`**: POST `https://<app-domain>/api/tools/slots`, header `X-Tool-Secret: <VAANI_WEBHOOK_SECRET>`, no parameters.
-- **Custom tool `book_consultation`**: POST `https://<app-domain>/api/tools/book`, same header. Parameters: `start_iso` (required),
+- **Custom tool `book_consultation_appointment`**: POST `https://<app-domain>/api/tools/book`, same header. Parameters: `start_iso` (required),
   `name` (required), `phone`, `consultation_type` (`site_visit` | `studio`), `locality`, `scope`.
 - **Webhook**: Settings → Webhooks → `https://<app-domain>/api/webhooks/vaani?token=<VAANI_WEBHOOK_SECRET>`.
