@@ -29,6 +29,11 @@ export async function createFirstAdmin(_: FormState, form: FormData): Promise<Fo
   const parsed = Bootstrap.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: "Name, a valid email and a password of 8+ characters are required." };
   if (!(await needsBootstrap())) return { error: "An admin already exists. Ask them to add you." };
+  // The site is public: only the configured owner may claim the first admin account
+  const owner = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!owner || parsed.data.email.trim().toLowerCase() !== owner) {
+    return { error: "Only the studio owner's email can create the first admin account." };
+  }
 
   const admin = createSupabaseAdmin();
   const { email, password, full_name } = parsed.data;
