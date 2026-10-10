@@ -38,7 +38,9 @@ export async function handleVaaniEvent(db: Db, payload: VaaniWebhook, opts: { is
     .select("id, phone, started_at, route, processing_error, booking_at")
     .eq("vaani_call_id", callId)
     .maybeSingle();
-  const eventPhone = normalizePhone(payload.phone_number ?? data.phone_number);
+  // Web test calls report "web-user" instead of a number
+  const rawPhone = payload.phone_number ?? data.phone_number;
+  const eventPhone = normalizePhone(rawPhone && /\d{6,}/.test(rawPhone) ? rawPhone : null);
   const eventAt = payload.timestamp ? new Date(payload.timestamp) : new Date();
 
   if (payload.event !== "call_postprocessing") {
@@ -59,13 +61,16 @@ export async function handleVaaniEvent(db: Db, payload: VaaniWebhook, opts: { is
   // Vaani retries failed deliveries; never triage or alert twice
   if (existing?.route && !existing.processing_error) return { duplicate: true, route: existing.route };
 
-  const voiceSeconds = data.call_duration != null ? Math.round(data.call_duration / 1000) : null;
-  const endedAt = eventAt;
-  const startedAt = existing?.started_at
-    ? new Date(existing.started_at)
-    : new Date(endedAt.getTime() - (voiceSeconds ?? 0) * 1000);
+  // Real payloads carry exact timestamps and call_duration in seconds; fall back defensively
+  const endedAt = data.call_ended_at ? new Date(data.call_ended_at) : eventAt;
+  const startedAtRaw = data.call_started_at ?? data.picked_up_at ?? existing?.started_at;
+  let voiceSeconds = data.call_duration != null ? Math.round(data.call_duration > 36_000 ? data.call_duration / 1000 : data.call_duration) : null;
+  if (voiceSeconds == null && startedAtRaw) voiceSeconds = Math.round((endedAt.getTime() - new Date(startedAtRaw).getTime()) / 1000);
+  const startedAt = startedAtRaw ? new Date(startedAtRaw) : new Date(endedAt.getTime() - (voiceSeconds ?? 0) * 1000);
   const entities = data.entities ?? null;
-  const phone = existing?.phone ?? eventPhone ?? normalizePhone(pick(entities, "phone", "phone_number", "mobile"));
+  const callerNumber = normalizePhone(/\d{6,}/.test(String(payload.from ?? "")) ? payload.from : null);
+  const phone =
+    existing?.phone ?? eventPhone ?? callerNumber ?? normalizePhone(pick(entities, "phone", "phone_number", "mobile"));
   const agentRoute = pick(data.dispositions, "route", "outcome", "disposition");
 
   const base: Record<string, unknown> = {
@@ -196,7 +201,9 @@ export async function handleVaaniEvent(db: Db, payload: VaaniWebhook, opts: { is
 
 function parseDate(v: string | null) {
   if (!v) return null;
-  const d = new Date(v);
+  // Extracted times come without a zone ("2026-10-12T11:00:00"): they are India time
+  const withZone = /T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(v) ? `${v}+05:30` : v;
+  const d = new Date(withZone);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 

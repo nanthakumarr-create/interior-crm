@@ -48,10 +48,16 @@ export type VaaniWebhook = {
   call_id?: string;
   timestamp?: string;
   phone_number?: string;
+  from?: string; // caller number on phone calls, "web-user" on web calls
+  to?: string;
   data?: {
     call_id?: string;
     room_name?: string;
-    call_duration?: number;
+    call_duration?: number; // seconds in real payloads (docs say ms)
+    call_started_at?: string;
+    picked_up_at?: string;
+    call_ended_at?: string;
+    call_type?: string;
     end_reason?: string;
     summary?: string;
     entities?: Record<string, unknown> | null;

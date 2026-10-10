@@ -4,7 +4,7 @@
 # Values are never printed. Press Enter to skip a key.
 # Run from the project root:  powershell -ExecutionPolicy Bypass -File scripts\set-secrets.ps1
 param(
-  [string[]]$Names = @("VAANI_API_KEY", "TELEGRAM_BOT_TOKEN", "HUBSPOT_ACCESS_TOKEN", "CALCOM_API_KEY")
+  [string[]]$Names = @("VAANI_API_KEY", "TELEGRAM_BOT_TOKEN", "HUBSPOT_ACCESS_TOKEN")
 )
 
 $envFile = Join-Path (Split-Path $PSScriptRoot -Parent) ".env.local"
