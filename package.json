@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "eval": "node --env-file=.env.local --conditions=react-server --import tsx scripts/eval.mts"
+    "eval": "node --env-file=.env.local --conditions=react-server --import tsx scripts/eval.mts",
+    "seed:demo": "node --env-file=.env.local --conditions=react-server --import tsx scripts/seed-demo.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
